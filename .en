@@ -1,5 +1,0 @@
-TELEGRAM_BOT_TOKEN=replace_me
-FATSECRET_CLIENT_ID=replace_me
-FATSECRET_CLIENT_SECRET=replace_me
-DATABASE_URL=postgresql://nofat:nofat@localhost:5432/nofat
-ENVIRONMENT=development
