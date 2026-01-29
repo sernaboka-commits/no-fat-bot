@@ -25,7 +25,7 @@ async def handle_start(message: Message) -> None:
     )
 
 
-@router.message()
+@router.message(StateFilter(None))
 async def handle_menu(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip().lower()
 
