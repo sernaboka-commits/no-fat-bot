@@ -1,6 +1,7 @@
 from aiogram import Router
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, StateFilter
 from aiogram.types import Message
+from aiogram.fsm.context import FSMContext
 
 from app.keyboards.main_menu import main_menu_keyboard
 
@@ -57,11 +58,9 @@ async def handle_menu(message: Message) -> None:
             "Используйте кнопки меню, чтобы внести вес, шаги или тренировку."
         )
         return
-
-   from aiogram.filters import StateFilter
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 
 @router.message(StateFilter(None))
 async def fallback(message: Message, state: FSMContext):
     await message.answer("Не понял сообщение. Пожалуйста, используйте кнопки меню.")
-    router.message.handlers.sort(key=lambda h: h.filters is not None)
