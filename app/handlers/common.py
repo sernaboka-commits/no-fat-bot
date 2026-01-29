@@ -2,7 +2,7 @@ from aiogram import Router
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.state import StatesGroup, State
 
 from app.keyboards.main_menu import main_menu_keyboard
 
@@ -12,11 +12,12 @@ router = Router()
 class InputState(StatesGroup):
     waiting_weight = State()
     waiting_steps = State()
-    waiting_training = State()
+    waiting_workout = State()
 
 
 @router.message(CommandStart())
-async def handle_start(message: Message) -> None:
+async def handle_start(message: Message, state: FSMContext) -> None:
+    await state.clear()
     await message.answer(
         "Привет! Я бот NoFAT.\n"
         "Я помогу вести вес, питание и активность.\n"
@@ -25,6 +26,7 @@ async def handle_start(message: Message) -> None:
     )
 
 
+# Меню работает ТОЛЬКО когда нет активного state
 @router.message(StateFilter(None))
 async def handle_menu(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip().lower()
@@ -40,7 +42,7 @@ async def handle_menu(message: Message, state: FSMContext) -> None:
         return
 
     if text in {"тренировка"}:
-        await state.set_state(InputState.waiting_training)
+        await state.set_state(InputState.waiting_workout)
         await message.answer("Опишите тренировку и длительность. Пример: силовая 45 минут")
         return
 
@@ -50,7 +52,6 @@ async def handle_menu(message: Message, state: FSMContext) -> None:
             "Будут подтянуты шаги и другие доступные метрики. "
             "Остальные данные можно внести вручную."
         )
-        # TODO: тут позже вызовешь сервис FatSecret и пришлёшь результат пользователю
         return
 
     if text in {"отчет недели", "отчёт недели", "отчет"}:
@@ -64,52 +65,54 @@ async def handle_menu(message: Message, state: FSMContext) -> None:
         await message.answer("Используйте кнопки меню, чтобы внести вес, шаги или тренировку.")
         return
 
-    # Если пользователь в состоянии (ждём ввод) — сюда он не должен попадать,
-    # потому что его перехватят хендлеры ниже по StateFilter(...)
-    # Если состояния нет — отработает fallback в конце файла.
+    # Фоллбек для сообщений вне state
+    await message.answer("Не понял сообщение. Пожалуйста, используйте кнопки меню.")
 
 
 @router.message(StateFilter(InputState.waiting_weight))
-async def save_weight(message: Message, state: FSMContext):
+async def handle_weight_input(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip().replace(",", ".")
     try:
         weight = float(raw)
-    except Exception:
-        await message.answer("Введите число. Пример: 82.5")
+    except ValueError:
+        await message.answer("Не похоже на число. Введите вес в кг, например: 82.5")
         return
 
-    # TODO: тут позже сохраняй в БД/файл
-    await message.answer(f"✅ Вес сохранён: {weight} кг\nОтличное начало дня 💪")
+    # здесь позже можно сохранять в БД / файл
+    await state.update_data(weight=weight)
+
+    await message.answer(f"Вес сохранён: {weight:g} кг\nОтличное начало дня 💪")
     await state.clear()
 
 
 @router.message(StateFilter(InputState.waiting_steps))
-async def save_steps(message: Message, state: FSMContext):
+async def handle_steps_input(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip().replace(" ", "")
     if not raw.isdigit():
-        await message.answer("Введите целое число. Пример: 8500")
+        await message.answer("Введите число шагов, например: 8500")
         return
 
     steps = int(raw)
+    await state.update_data(steps=steps)
 
-    # TODO: тут позже сохраняй в БД/файл
-    pretty = f"{steps:,}".replace(",", " ")
-    await message.answer(f"✅ Шаги сохранены: {pretty}\nЭто мощно, так держать 🔥")
+    # простая “похвала”
+    if steps >= 10000:
+        tail = "Это больше дневной нормы, так держать 🔥"
+    else:
+        tail = "Хорошо! Завтра попробуем чуть больше 🙂"
+
+    await message.answer(f"Шаги сохранены: {steps:,}".replace(",", " ") + f"\n{tail}")
     await state.clear()
 
 
-@router.message(StateFilter(InputState.waiting_training))
-async def save_training(message: Message, state: FSMContext):
-    training = (message.text or "").strip()
-    if not training:
-        await message.answer("Напишите текстом. Пример: силовая 45 минут")
+@router.message(StateFilter(InputState.waiting_workout))
+async def handle_workout_input(message: Message, state: FSMContext) -> None:
+    workout = (message.text or "").strip()
+    if not workout:
+        await message.answer("Напишите текстом тренировку, например: силовая 45 минут")
         return
 
-    # TODO: тут позже сохраняй в БД/файл
-    await message.answer(f"✅ Тренировка сохранена:\n{training}\nКруто 💪")
+    await state.update_data(workout=workout)
+
+    await message.answer(f"Тренировка сохранена: {workout}\nКруто, ты в деле 💪")
     await state.clear()
-
-
-@router.message(StateFilter(None))
-async def fallback(message: Message, state: FSMContext):
-    await message.answer("Не понял сообщение. Пожалуйста, используйте кнопки меню.")
