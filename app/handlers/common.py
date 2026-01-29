@@ -58,7 +58,10 @@ async def handle_menu(message: Message) -> None:
         )
         return
 
-    await message.answer(
-        "Не понял сообщение. Пожалуйста, используйте кнопки меню.",
-        reply_markup=main_menu_keyboard(),
-    )
+   from aiogram.filters import StateFilter
+from aiogram.fsm.context import FSMContext
+
+@router.message(StateFilter(None))
+async def fallback(message: Message, state: FSMContext):
+    await message.answer("Не понял сообщение. Пожалуйста, используйте кнопки меню.")
+    router.message.handlers.sort(key=lambda h: h.filters is not None)
