@@ -1,32 +1,38 @@
 import asyncio
-import logging
+import uvicorn
 
 from aiogram import Bot, Dispatcher
-
-from app.config import load_settings, summarize_optional_env
+from app.config import BOT_TOKEN
 from app.handlers.common import router as common_router
+from app.web import app as web_app
 
-async def main() -> None:
-    settings = load_settings()
-    optional_env = summarize_optional_env()
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+dp.include_router(common_router)
+
+
+async def start_bot():
+    await dp.start_polling(bot)
+
+
+async def start_web():
+    config = uvicorn.Config(
+        web_app,
+        host="0.0.0.0",
+        port=8080,
+        log_level="info"
+    )
+    server = uvicorn.Server(config)
+    await server.serve()
+
+
+async def main():
+    await asyncio.gather(
+        start_bot(),
+        start_web()
     )
 
-    if not all(optional_env.values()):
-        missing = [name for name, present in optional_env.items() if not present]
-        logging.getLogger(__name__).warning(
-            "Optional environment variables not set yet: %s",
-            ", ".join(missing),
-        )
-
-    bot = Bot(token=settings.telegram_bot_token)
-    dispatcher = Dispatcher()
-    dispatcher.include_router(common_router)
-
-    await dispatcher.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
